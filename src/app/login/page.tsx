@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSupabase, useUser } from '@/supabase';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,13 +14,14 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, User as UserIcon } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const supabase = useSupabase();
   const { user, isUserLoading, isProfileLoading } = useUser();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -28,6 +29,7 @@ export default function LoginPage() {
   const { toast } = useToast();
 
   const isLoadingAuthOrProfile = isUserLoading || isProfileLoading;
+  const redirectTo = searchParams.get('redirect') || '/';
 
   useEffect(() => {
     if (isLoadingAuthOrProfile) {
@@ -36,12 +38,12 @@ export default function LoginPage() {
     
     if (user) {
       if (user.profile?.isAdmin) {
-        router.push('/admin');
+        router.replace('/admin'); // prevent back navigation to login
       } else {
-        router.push('/');
+        router.replace(redirectTo || '/'); // prevent back navigation to login
       }
     }
-  }, [user, isLoadingAuthOrProfile, router]);
+  }, [user, isLoadingAuthOrProfile, router, redirectTo]);
 
   const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -101,8 +103,12 @@ export default function LoginPage() {
                       if (isAdmin) {
                         toast({ title: 'Admin Account Created', description: 'You have admin privileges.' });
                       }
-                      // Refresh to sync cookies
-                      window.location.reload();
+                      // Redirect based on user role or redirect parameter
+                      if (isAdmin) {
+                        router.replace('/admin');
+                      } else {
+                        router.replace(redirectTo || '/');
+                      }
                     } else {
                       toast({ 
                         title: 'Please check your email',
@@ -123,8 +129,12 @@ export default function LoginPage() {
       } else if (signInData?.user) {
         // Successful sign in
         toast({ title: 'Signed In', description: 'Welcome back!' });
-        // Refresh the page to ensure middleware syncs cookies
-        window.location.reload();
+        // Redirect based on user role or redirect parameter
+        if (signInData.user.email === 'admin@example.com') {
+          router.replace('/admin');
+        } else {
+          router.replace(redirectTo || '/');
+        }
       }
     } catch (error: any) {
       setError(error.message || 'An unexpected error occurred.');
@@ -133,30 +143,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleAnonymousSignIn = async () => {
-    if (!supabase) {
-        setError("Authentication service is not available.");
-        return;
-    }
-    setIsProcessing(true);
-    setError(null);
-    try {
-      const { data, error: anonError } = await supabase.auth.signInAnonymously();
-      
-      if (anonError) {
-        setError(anonError.message);
-      } else {
-        toast({
-          title: 'Signed in Anonymously',
-          description: 'You can now explore the campus tour.',
-        });
-      }
-    } catch (error: any) {
-      setError(error.message);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   if (isLoadingAuthOrProfile || user) {
     return (
@@ -173,7 +159,7 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle className="text-2xl font-headline">Sign In</CardTitle>
           <CardDescription>
-            Enter email and password to sign in or create an account. Use <strong>admin@example.com</strong> to create an admin account.
+            Enter email and password to sign in or create an account. {/*Use <strong>admin@example.com</strong> to create an admin account. Authentication is required to use the application.*/}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
@@ -210,31 +196,6 @@ export default function LoginPage() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col gap-4">
-          <div className="relative w-full">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={handleAnonymousSignIn}
-            disabled={isProcessing || !supabase}
-          >
-            {isProcessing ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <UserIcon className="mr-2 h-4 w-4" />
-            )}
-            Anonymous Sign-In
-          </Button>
-        </CardFooter>
       </Card>
     </div>
   );

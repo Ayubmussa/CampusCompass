@@ -3,9 +3,10 @@ import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import { SupabaseClientProvider } from '@/supabase';
+import { EnvDebug } from '@/components/env-debug';
 
 export const metadata: Metadata = {
-  title: 'UniSphere 360',
+  title: 'CampusCompass',
   description: 'An interactive 360 virtual tour of the university campus.',
 };
 
@@ -34,6 +35,7 @@ export default function RootLayout({
             {children}
           </div>
           <Toaster />
+          {/* <EnvDebug /> */}
         </SupabaseClientProvider>
       </body>
     </html>

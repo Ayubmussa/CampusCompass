@@ -205,6 +205,10 @@ export async function addLocationAction(locationData: Omit<Location, 'id'>) {
             return { success: false, error: "You must be logged in to add locations. Please refresh the page and try again." };
         }
 
+        if (!locationData.placeId) {
+            return { success: false, error: "Place is required. Please select a place for this location." };
+        }
+
         // Verify user is admin
         const { data: userProfile, error: profileError } = await supabase
             .from('users')
@@ -232,6 +236,7 @@ export async function addLocationAction(locationData: Omit<Location, 'id'>) {
             .insert({
                 name: locationData.name,
                 description: locationData.description,
+                place_id: locationData.placeId,
                 panorama_url: locationData.panoramaUrl,
                 thumbnail_url: locationData.thumbnailUrl,
                 coordinates: locationData.coordinates,
@@ -283,6 +288,7 @@ export async function updateLocationAction(locationData: Partial<Location> & { i
         const updateData: any = {};
         if (locationData.name) updateData.name = locationData.name;
         if (locationData.description) updateData.description = locationData.description;
+        if (locationData.placeId) updateData.place_id = locationData.placeId;
         if (locationData.panoramaUrl) updateData.panorama_url = locationData.panoramaUrl;
         if (locationData.thumbnailUrl) updateData.thumbnail_url = locationData.thumbnailUrl;
         if (locationData.coordinates) updateData.coordinates = locationData.coordinates;
@@ -336,5 +342,270 @@ export async function deleteLocationAction(locationId: string) {
         console.error("Error deleting location: ", error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, error: `Failed to delete location: ${errorMessage}` };
+    }
+}
+
+// Place management actions
+export async function addPlaceAction(placeData: {
+  name: string;
+  description: string;
+  thumbnailUrl: string;
+}) {
+    const supabase = await createServerSupabaseClient();
+    try {
+        // Verify authentication and admin status
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+            return { success: false, error: "You must be logged in to add places." };
+        }
+
+        // Verify user is admin
+        const { data: userProfile, error: profileError } = await supabase
+            .from('users')
+            .select('is_admin')
+            .eq('uid', user.id)
+            .single();
+
+        if (profileError || !userProfile?.is_admin) {
+            return { success: false, error: "You must be an admin to add places." };
+        }
+
+        const now = new Date().toISOString();
+
+        const { data: insertedData, error } = await supabase
+            .from('places')
+            .insert({
+                name: placeData.name,
+                description: placeData.description,
+                thumbnail_url: placeData.thumbnailUrl,
+                // Satisfy NOT NULL constraints if the columns don't have defaults
+                created_at: now,
+                updated_at: now,
+            })
+            .select();
+
+        if (error) throw error;
+        return { success: true, data: insertedData };
+    } catch (error) {
+        console.error("Error adding place: ", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, error: `Failed to add place: ${errorMessage}` };
+    }
+}
+
+export async function updatePlaceAction(placeData: {
+  id: string;
+  name: string;
+  description: string;
+  thumbnailUrl: string;
+}) {
+    const supabase = await createServerSupabaseClient();
+    try {
+        // Verify authentication and admin status
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
+            return { success: false, error: "You must be logged in to update places." };
+        }
+        
+        // Verify user is admin
+        const { data: userProfile, error: profileError } = await supabase
+            .from('users')
+            .select('is_admin')
+            .eq('uid', user.id)
+            .single();
+
+        if (profileError || !userProfile?.is_admin) {
+            return { success: false, error: "You must be an admin to update places." };
+        }
+
+        const { error } = await supabase
+            .from('places')
+            .update({
+                name: placeData.name,
+                description: placeData.description,
+                thumbnail_url: placeData.thumbnailUrl,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', placeData.id);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error("Error updating place: ", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, error: `Failed to update place: ${errorMessage}` };
+    }
+}
+
+export async function deletePlaceAction(placeId: string) {
+    const supabase = await createServerSupabaseClient();
+    try {
+        // Verify authentication and admin status
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
+            return { success: false, error: "You must be logged in to delete places." };
+        }
+        
+        // Verify user is admin
+        const { data: userProfile, error: profileError } = await supabase
+            .from('users')
+            .select('is_admin')
+            .eq('uid', user.id)
+            .single();
+
+        if (profileError || !userProfile?.is_admin) {
+            return { success: false, error: "You must be an admin to delete places." };
+        }
+
+        const { error } = await supabase
+            .from('places')
+            .delete()
+            .eq('id', placeId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error("Error deleting place: ", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, error: `Failed to delete place: ${errorMessage}` };
+    }
+}
+
+// Map management actions
+export async function addMapAction(mapData: {
+  name: string;
+  description?: string;
+  image_url: string;
+  page_number: number;
+  place_id: string;
+}) {
+    const supabase = await createServerSupabaseClient();
+    try {
+        // Verify authentication and admin status
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
+            return { success: false, error: "You must be logged in to add maps." };
+        }
+
+        if (!mapData.place_id) {
+            return { success: false, error: "Place is required. Please select a place for this map." };
+        }
+        
+        // Verify user is admin
+        const { data: userProfile, error: profileError } = await supabase
+            .from('users')
+            .select('is_admin')
+            .eq('uid', user.id)
+            .single();
+
+        if (profileError || !userProfile?.is_admin) {
+            return { success: false, error: "You must be an admin to add maps." };
+        }
+
+        const { data: insertedData, error } = await supabase
+            .from('maps')
+            .insert({
+                name: mapData.name,
+                description: mapData.description,
+                image_url: mapData.image_url,
+                page_number: mapData.page_number,
+                place_id: mapData.place_id,
+            })
+            .select();
+
+        if (error) throw error;
+        return { success: true, data: insertedData };
+    } catch (error) {
+        console.error("Error adding map: ", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, error: `Failed to add map: ${errorMessage}` };
+    }
+}
+
+export async function updateMapAction(mapData: {
+  id: string;
+  name: string;
+  description?: string;
+  image_url: string;
+  page_number: number;
+  place_id: string;
+}) {
+    const supabase = await createServerSupabaseClient();
+    try {
+        // Verify authentication and admin status
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
+            return { success: false, error: "You must be logged in to update maps." };
+        }
+        
+        // Verify user is admin
+        const { data: userProfile, error: profileError } = await supabase
+            .from('users')
+            .select('is_admin')
+            .eq('uid', user.id)
+            .single();
+
+        if (profileError || !userProfile?.is_admin) {
+            return { success: false, error: "You must be an admin to update maps." };
+        }
+
+        const { error } = await supabase
+            .from('maps')
+            .update({
+                name: mapData.name,
+                description: mapData.description,
+                image_url: mapData.image_url,
+                page_number: mapData.page_number,
+                place_id: mapData.place_id,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', mapData.id);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error("Error updating map: ", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, error: `Failed to update map: ${errorMessage}` };
+    }
+}
+
+export async function deleteMapAction(mapId: string) {
+    const supabase = await createServerSupabaseClient();
+    try {
+        // Verify authentication and admin status
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
+            return { success: false, error: "You must be logged in to delete maps." };
+        }
+        
+        // Verify user is admin
+        const { data: userProfile, error: profileError } = await supabase
+            .from('users')
+            .select('is_admin')
+            .eq('uid', user.id)
+            .single();
+
+        if (profileError || !userProfile?.is_admin) {
+            return { success: false, error: "You must be an admin to delete maps." };
+        }
+
+        const { error } = await supabase
+            .from('maps')
+            .delete()
+            .eq('id', mapId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error("Error deleting map: ", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, error: `Failed to delete map: ${errorMessage}` };
     }
 }

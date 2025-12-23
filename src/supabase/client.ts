@@ -12,12 +12,29 @@ export const createSupabaseClient = () => {
     return supabaseClientInstance;
   }
 
-  // Create new instance using SSR client which handles cookies properly
-  supabaseClientInstance = createBrowserClient(
-    supabaseConfig.url,
-    supabaseConfig.anonKey
-  );
+  try {
+    // Validate config before creating client - wrap in try-catch for safety
+    const url = supabaseConfig.url;
+    const anonKey = supabaseConfig.anonKey;
+    
+    // Check for empty strings as well as null/undefined
+    if (!url || url.trim() === '' || !anonKey || anonKey.trim() === '') {
+      if (typeof window !== 'undefined') {
+        console.error('Supabase configuration is missing. Please check your environment variables.');
+        console.error('URL present:', !!url && url.trim() !== '');
+        console.error('AnonKey present:', !!anonKey && anonKey.trim() !== '');
+      }
+      // Return null instead of throwing - let components handle it gracefully
+      return null;
+    }
 
-  return supabaseClientInstance;
+    // Create new instance using SSR client which handles cookies properly
+    supabaseClientInstance = createBrowserClient(url, anonKey);
+
+    return supabaseClientInstance;
+  } catch (error) {
+    console.error('Error creating Supabase client:', error);
+    return null;
+  }
 };
 

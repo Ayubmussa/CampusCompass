@@ -15,7 +15,7 @@ export type UserProfile = {
 };
 
 export interface UserHookResult {
-  user: (User & { profile: UserProfile | null; isAnonymous: boolean }) | null;
+  user: (User & { profile: UserProfile | null }) | null;
   isUserLoading: boolean;
   isProfileLoading: boolean;
   userError: Error | null;
@@ -37,44 +37,13 @@ export const useUser = (): UserHookResult => {
     }
 
     const client = supabase;
-
     let mounted = true;
 
-    // Get authenticated user - getUser() verifies with Supabase Auth server
-    client.auth.getUser().then(({ data: { user }, error }) => {
-      if (!mounted) return;
-      
-      if (error) {
-        setUserState({ user: null, isUserLoading: false, isProfileLoading: false, userError: error });
-        return;
-      }
-
-      if (user) {
-        loadUserProfile(user);
-      } else {
-        setUserState({ user: null, isUserLoading: false, isProfileLoading: false, userError: null });
-      }
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = client.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
-        
-        if (session?.user) {
-          await loadUserProfile(session.user);
-        } else {
-          setUserState({ user: null, isUserLoading: false, isProfileLoading: false, userError: null });
-        }
-      }
-    );
-
-    async function loadUserProfile(authUser: User) {
+    const loadUserProfile = async (authUser: User) => {
       if (!mounted) return;
       setUserState(prev => ({ ...prev, isUserLoading: false, isProfileLoading: true }));
 
       try {
-        // Check if profile exists
         const { data: profile, error } = await client
           .from('users')
           .select('*')
@@ -84,8 +53,6 @@ export const useUser = (): UserHookResult => {
         let userProfile: UserProfile | null = null;
 
         if (error && error.code === 'PGRST116') {
-          // Profile doesn't exist, create it
-          const isAnonymous = authUser.is_anonymous || false;
           const newProfile: UserProfile = {
             uid: authUser.id,
             email: authUser.email,
@@ -111,7 +78,6 @@ export const useUser = (): UserHookResult => {
             .single();
 
           if (createError) throw createError;
-          // Map snake_case back to camelCase
           userProfile = {
             uid: createdProfile.uid,
             email: createdProfile.email,
@@ -124,7 +90,6 @@ export const useUser = (): UserHookResult => {
         } else if (error) {
           throw error;
         } else {
-          // Profile exists, update last login and map to camelCase
           await client
             .from('users')
             .update({ last_login: new Date().toISOString() })
@@ -147,7 +112,6 @@ export const useUser = (): UserHookResult => {
           user: {
             ...authUser,
             profile: userProfile,
-            isAnonymous: authUser.is_anonymous || false,
           },
           isUserLoading: false,
           isProfileLoading: false,
@@ -163,11 +127,57 @@ export const useUser = (): UserHookResult => {
           isProfileLoading: false,
         }));
       }
-    }
+    };
+
+    const fetchUser = async () => {
+      try {
+        const { data: { user }, error } = await client.auth.getUser();
+        if (!mounted) return;
+
+        if (error) {
+          setUserState({ user: null, isUserLoading: false, isProfileLoading: false, userError: error });
+          return;
+        }
+
+        if (user) {
+          await loadUserProfile(user);
+        } else {
+          setUserState({ user: null, isUserLoading: false, isProfileLoading: false, userError: null });
+        }
+      } catch (err: any) {
+        if (!mounted) return;
+        console.error('Error fetching auth user:', err);
+        setUserState({ user: null, isUserLoading: false, isProfileLoading: false, userError: err });
+      }
+    };
+
+    fetchUser();
+
+    // Listen for auth changes
+    const { data: { subscription } } = client.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (!mounted) return;
+        
+        if (session?.user) {
+          await loadUserProfile(session.user);
+        } else {
+          setUserState({ user: null, isUserLoading: false, isProfileLoading: false, userError: null });
+        }
+      }
+    );
+
+    // Fallback: on visibility/focus, refetch to avoid stuck loading after tab switching
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchUser();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [supabase]);
 

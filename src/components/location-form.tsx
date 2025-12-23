@@ -15,16 +15,25 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { addLocationAction, updateLocationAction } from '@/app/actions';
 import { Loader2, X } from 'lucide-react';
 import { type Location } from '@/lib/locations';
-import { useSupabase, useUser } from '@/supabase';
+import { useSupabase, useUser, useCollection, useMemoSupabase } from '@/supabase';
 import { Progress } from '@/components/ui/progress';
+import { type Place } from '@/lib/places';
 
 const formSchema = z.object({
   name: z.string().min(3, { message: 'Name must be at least 3 characters.' }),
   description: z.string().min(10, { message: 'Description must be at least 10 characters.' }),
+  placeId: z.string().min(1, { message: 'Please select a place.' }),
   panoramaUrl: z.string().url({ message: 'Please upload a panorama image.' }),
   thumbnailUrl: z.string().url({ message: 'Please upload a thumbnail image.' }),
   lat: z.number(),
@@ -48,11 +57,32 @@ export function LocationForm({ location, onFormSubmit }: LocationFormProps) {
 
   const isUserAdmin = user?.profile?.isAdmin === true;
 
+  // Fetch places for the dropdown
+  const placesQuery = useMemoSupabase(() => {
+    return {
+      table: 'places',
+      filter: (query: any) => query.order('name', { ascending: true }),
+      __memo: true
+    };
+  }, []);
+  const { data: placesData } = useCollection<any>(placesQuery);
+  const places: Place[] | null = placesData
+    ? placesData.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        thumbnailUrl: item.thumbnail_url,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+      }))
+    : null;
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: location?.name || '',
       description: location?.description || '',
+      placeId: location?.placeId || '',
       panoramaUrl: location?.panoramaUrl || '',
       thumbnailUrl: location?.thumbnailUrl || '',
       lat: location?.coordinates?.lat ?? 0,
@@ -116,7 +146,7 @@ export function LocationForm({ location, onFormSubmit }: LocationFormProps) {
   };
 
   const cancelUpload = (fieldName: 'panoramaUrl' | 'thumbnailUrl') => {
-    // Supabase uploads are not cancelable like Firebase, but we can reset state
+    // Supabase uploads are not cancelable, but we can reset state
     setUploadProgress(prev => ({...prev, [fieldName]: 0}));
     setIsUploading(prev => ({...prev, [fieldName]: false}));
     setUploadError(prev => ({...prev, [fieldName]: 'Upload canceled.'}));
@@ -139,6 +169,7 @@ export function LocationForm({ location, onFormSubmit }: LocationFormProps) {
     const locationData = {
         name: values.name,
         description: values.description,
+        placeId: values.placeId,
         panoramaUrl: values.panoramaUrl,
         thumbnailUrl: values.thumbnailUrl,
         coordinates: {
@@ -224,6 +255,32 @@ export function LocationForm({ location, onFormSubmit }: LocationFormProps) {
               <FormControl>
                 <Textarea placeholder="A short description of the location." {...field} rows={4} />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="placeId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Place</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a place" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {places?.map((place) => (
+                    <SelectItem key={place.id} value={place.id}>
+                      {place.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>Select the place this location belongs to.</FormDescription>
               <FormMessage />
             </FormItem>
           )}

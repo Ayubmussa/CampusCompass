@@ -67,7 +67,7 @@ export function useCollection<T = any>(
     }
 
     if (memoizedQuery && !memoizedQuery.__memo) {
-      throw new Error(memoizedQuery.table + ' was not properly memoized using useMemoFirebase');
+      throw new Error(memoizedQuery.table + ' was not properly memoized using useMemoSupabase');
     }
 
     let mounted = true;

@@ -5,6 +5,14 @@ import { supabaseConfig } from './config';
 export const createServerSupabaseClient = async () => {
   const cookieStore = await cookies();
 
+  // Validate config on server side (should always be available)
+  if (!supabaseConfig.url || !supabaseConfig.anonKey) {
+    throw new Error(
+      'Missing required Supabase environment variables. ' +
+      'Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your .env.local file.'
+    );
+  }
+
   return createServerClient(
     supabaseConfig.url,
     supabaseConfig.anonKey,

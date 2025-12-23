@@ -40,7 +40,7 @@ import {
   Map,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useSupabase, useCollection, useMemoFirebase, useUser } from '@/supabase';
+import { useSupabase, useCollection, useMemoSupabase, useUser } from '@/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -107,11 +107,11 @@ function UserProfile() {
             <Avatar className="h-8 w-8">
               {user.profile?.photoURL && <AvatarImage src={user.profile.photoURL} alt={user.profile.displayName || 'User'} />}
               <AvatarFallback>
-                {user.isAnonymous ? <User className="h-4 w-4" /> : user.email?.charAt(0).toUpperCase()}
+                {user.email?.charAt(0).toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col overflow-hidden text-sm">
-              <p className="font-medium truncate">{user.isAnonymous ? 'Anonymous User' : user.email}</p>
+              <p className="font-medium truncate">{user.email || 'User'}</p>
             </div>
           </div>
           <div className='flex items-center'>
@@ -149,7 +149,7 @@ function SavedTours({ onStartTour }: { onStartTour: (ids: string[]) => void }) {
         setIsMounted(true);
     }, []);
 
-    const savedToursQuery = useMemoFirebase(() => {
+    const savedToursQuery = useMemoSupabase(() => {
         if (!user) return null;
         return { 
             table: 'saved_tours',
@@ -176,7 +176,7 @@ function SavedTours({ onStartTour }: { onStartTour: (ids: string[]) => void }) {
       return null;
     }
     
-    if (!user || user.isAnonymous) return null;
+    if (!user) return null;
 
 
     return (
@@ -246,10 +246,6 @@ export function TourSidebar({
     if (!state.recommendations || !state.tourName || !state.tourDescription || !user) {
         toast({ variant: 'destructive', title: 'Error', description: 'Cannot save tour. Missing data.' });
         return;
-    }
-    if (user.isAnonymous) {
-      toast({ variant: 'destructive', title: 'Anonymous User', description: 'Please sign in to save tours.' });
-      return;
     }
 
     const result = await saveTourAction({
@@ -333,7 +329,7 @@ export function TourSidebar({
                               <h4 className="font-headline font-semibold">{state.tourName}</h4>
                               <p className="text-sm text-muted-foreground">{state.tourDescription}</p>
                           </div>
-                          {user && !user.isAnonymous && (
+                          {user && (
                             <Button size="icon" variant="ghost" onClick={handleSaveTour} title="Save Tour">
                                 <Save className="size-4" />
                             </Button>

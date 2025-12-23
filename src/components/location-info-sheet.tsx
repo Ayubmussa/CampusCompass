@@ -140,7 +140,7 @@ export function LocationInfoSheet({
                 <ScrollArea className="h-full">
                     <div className="pr-6">
                         <h3 className="font-headline text-lg mb-2">Reviews & Ratings</h3>
-                        {user && !user.isAnonymous && <ReviewForm locationId={location.id} user={user} />}
+                        {user && <ReviewForm locationId={location.id} user={user} />}
                         <Separator className="my-4" />
                         <ReviewList locationId={location.id} />
                     </div>

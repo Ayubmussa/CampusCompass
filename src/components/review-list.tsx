@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useCollection, useMemoFirebase } from '@/supabase';
+import { useCollection, useMemoSupabase } from '@/supabase';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -22,7 +22,7 @@ type ReviewListProps = {
 };
 
 export function ReviewList({ locationId }: ReviewListProps) {
-  const reviewsQuery = useMemoFirebase(() => {
+  const reviewsQuery = useMemoSupabase(() => {
     if (!locationId) return null;
     return { 
       table: 'reviews', 
@@ -56,7 +56,7 @@ export function ReviewList({ locationId }: ReviewListProps) {
                 <AvatarFallback>{review.display_name?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
             </Avatar>
             <div className="flex-grow">
-                <CardTitle className="text-sm font-medium">{review.display_name || 'Anonymous'}</CardTitle>
+                <CardTitle className="text-sm font-medium">{review.display_name || 'User'}</CardTitle>
                 <p className="text-xs text-muted-foreground">
                 {review.created_at ? formatDistanceToNow(new Date(review.created_at), { addSuffix: true }) : ''}
                 </p>

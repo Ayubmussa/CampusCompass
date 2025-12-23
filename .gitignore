@@ -16,3 +16,4 @@ tailwind.config.ts
 USER_STORIES_REPORT.md
 USER_STORIES_REPORT.tex
 Map
+.env.local

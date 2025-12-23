@@ -20,7 +20,7 @@ export function ReviewForm({ locationId, user }: ReviewFormProps) {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const { toast } = useToast();
 
-  if (!user || user.isAnonymous) {
+  if (!user) {
     return (
       <p className="text-sm text-muted-foreground">
         Please sign in to leave a review.
@@ -45,7 +45,7 @@ export function ReviewForm({ locationId, user }: ReviewFormProps) {
       rating,
       comment,
       userId: user.id,
-      displayName: user.profile?.displayName || user.email?.split('@')[0] || 'Anonymous',
+      displayName: user.profile?.displayName || user.email?.split('@')[0] || 'User',
     });
     setIsSubmitting(false);
 

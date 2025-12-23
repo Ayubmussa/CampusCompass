@@ -12,6 +12,7 @@ export type Location = {
   description: string;
   panoramaUrl: string;
   thumbnailUrl: string;
+  placeId?: string; // Reference to the place this location belongs to
   coordinates: {
     lat: number;
     lng: number;

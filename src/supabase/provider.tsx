@@ -51,31 +51,20 @@ export const useSupabaseServices = (): SupabaseServices => {
   };
 };
 
-// Compatibility hooks - matching Firebase API
-export const useAuth = (): SupabaseClient | null => {
-  return useSupabase();
-};
-
-export const useFirestore = (): SupabaseClient | null => {
-  return useSupabase();
-};
-
-export const useStorage = (): SupabaseClient | null => {
-  return useSupabase();
-};
-
-export const useFirebase = (): SupabaseServices => {
-  return useSupabaseServices();
-};
-
 type MemoSupabase<T> = T & { __memo?: boolean };
 
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | MemoSupabase<T> {
+export function useMemoSupabase<T>(factory: () => T, deps: DependencyList): T | MemoSupabase<T> {
   const memoized = useMemo(factory, deps);
   
   if (typeof memoized !== 'object' || memoized === null) return memoized;
   (memoized as MemoSupabase<T>).__memo = true;
   
   return memoized;
+}
+
+// Deprecated: Use useMemoSupabase instead
+// @deprecated This function is kept for backward compatibility but will be removed
+export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | MemoSupabase<T> {
+  return useMemoSupabase(factory, deps);
 }
 

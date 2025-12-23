@@ -4,7 +4,10 @@ import { useUser } from '@/supabase';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { LocationAdminPage } from '@/components/location-admin-page';
+import { PlaceAdminPage } from '@/components/place-admin-page';
+import { MapAdminPage } from '@/components/map-admin-page';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import * as React from 'react';
 
@@ -12,6 +15,7 @@ export default function AdminPage() {
   // isUserLoading is for auth state, isProfileLoading is for Firestore profile data
   const { user, isUserLoading, isProfileLoading } = useUser();
   const router = useRouter();
+  const [activeTab, setActiveTab] = React.useState('places');
 
   // We are only "done" loading when both are false.
   const isLoading = isUserLoading || isProfileLoading;
@@ -51,13 +55,28 @@ export default function AdminPage() {
   return (
     <div>
         <header className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
-            <h1 className="text-lg font-semibold">Admin - Manage Locations</h1>
+            <h1 className="text-lg font-semibold">Admin Panel</h1>
             <Button asChild>
                 <Link href="/">Back to Tour</Link>
             </Button>
         </header>
         <main className="p-4 lg:p-6">
-            <LocationAdminPage />
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="mb-4">
+                    <TabsTrigger value="places">Places</TabsTrigger>
+                    <TabsTrigger value="maps">Maps</TabsTrigger>
+                    <TabsTrigger value="locations">Locations</TabsTrigger>
+                </TabsList>
+                <TabsContent value="places">
+                    <PlaceAdminPage />
+                </TabsContent>
+                <TabsContent value="maps">
+                    <MapAdminPage />
+                </TabsContent>
+                <TabsContent value="locations">
+                    <LocationAdminPage />
+                </TabsContent>
+            </Tabs>
         </main>
     </div>
   );

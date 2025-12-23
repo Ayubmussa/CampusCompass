@@ -12,9 +12,10 @@ import { TourSidebar } from '@/components/tour-sidebar';
 import dynamic from 'next/dynamic';
 import { Button } from './ui/button';
 import { Map } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { LocationInfoSheet } from './location-info-sheet';
 import { MapLocationInfoSheet } from './map-location-info-sheet';
-import { useCollection, useMemoFirebase } from '@/supabase';
+import { useCollection, useMemoSupabase } from '@/supabase';
 import { type Location } from '@/lib/locations';
 import { MapViewer } from './map-viewer';
 
@@ -27,11 +28,23 @@ type MapOnlyLocation = {
 
 type ViewMode = 'locations' | 'maps';
 
-export function CampusTour() {
-  const [viewMode, setViewMode] = React.useState<ViewMode>('locations');
-  const locationsQuery = useMemoFirebase(() => {
-      return { table: 'locations', __memo: true }
-  }, []);
+type CampusTourProps = {
+  placeId: string;
+  initialLocationId?: string | null;
+  initialViewMode?: ViewMode;
+};
+
+export function CampusTour({ placeId, initialLocationId, initialViewMode = 'locations' }: CampusTourProps) {
+  const [viewMode, setViewMode] = React.useState<ViewMode>(initialViewMode);
+  const router = useRouter();
+  // Filter locations by the selected place - only locations belonging to this place will be shown
+  const locationsQuery = useMemoSupabase(() => {
+      return { 
+        table: 'locations',
+        filter: (query: any) => query.eq('place_id', placeId),
+        __memo: true 
+      }
+  }, [placeId]);
   const { data: allLocations, isLoading: isLoadingLocations, error } = useCollection<any>(locationsQuery);
   
   // Log for debugging
@@ -51,6 +64,7 @@ export function CampusTour() {
     description: item.description,
     panoramaUrl: item.panorama_url,
     thumbnailUrl: item.thumbnail_url,
+    placeId: item.place_id,
     coordinates: item.coordinates,
     connections: item.connections || [],
   })) : null;
@@ -60,16 +74,20 @@ export function CampusTour() {
   const [currentTourIndex, setCurrentTourIndex] = React.useState(0);
   const [isTtsEnabled, setIsTtsEnabled] = React.useState(true);
   const [rotationSpeed, setRotationSpeed] = React.useState(0.1);
-  const [currentLocationId, setCurrentLocationId] = React.useState<string | null>(null);
+  const [currentLocationId, setCurrentLocationId] = React.useState<string | null>(initialLocationId || null);
   const [selectedLocationForInfo, setSelectedLocationForInfo] = React.useState<Location | null>(null);
   const [selectedMapOnlyLocation, setSelectedMapOnlyLocation] = React.useState<MapOnlyLocation | null>(null);
 
-  // When locations load, set the first one as active
+  // When locations load, set the initial location or first one as active
   React.useEffect(() => {
     if (!currentLocationId && mappedLocations && mappedLocations.length > 0) {
-      setCurrentLocationId(mappedLocations[0].id);
+      // Use initialLocationId if provided and valid, otherwise use first location
+      const targetId = initialLocationId && mappedLocations.some(loc => loc.id === initialLocationId)
+        ? initialLocationId
+        : mappedLocations[0].id;
+      setCurrentLocationId(targetId);
     }
-  }, [mappedLocations, currentLocationId]);
+  }, [mappedLocations, currentLocationId, initialLocationId]);
 
   const handleStartTour = (ids: string[]) => {
     setTourPath(ids);
@@ -130,10 +148,18 @@ export function CampusTour() {
             <Button variant="ghost" size="icon" className="shrink-0 md:hidden" asChild>
               <SidebarTrigger />
             </Button>
-            <a href="/" className='flex items-center gap-2 font-headline text-lg font-semibold'>
+            <button
+              onClick={() => router.push('/')}
+              className="flex items-center gap-2 font-headline text-lg font-semibold"
+            >
               <Map className='h-6 w-6' />
-              <span>UniSphere 360</span>
-            </a>
+              <span>CampusCompass</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => router.push('/')}>
+              Change place
+            </Button>
           </div>
         </header>
         <SidebarInset>
@@ -146,6 +172,7 @@ export function CampusTour() {
             ) : (
               <MapViewer 
                 locations={mappedLocations || []}
+                placeId={placeId}
                 onLocationClick={(locationId) => {
                   setCurrentLocationId(locationId);
                   setViewMode('locations'); // Switch to locations view to show 360 image

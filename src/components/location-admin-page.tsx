@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useCollection, useMemoFirebase } from '@/supabase';
+import { useCollection, useMemoSupabase } from '@/supabase';
 import { Loader2, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,7 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { type Location } from '@/lib/locations';
 
 export function LocationAdminPage() {
-    const locationsQuery = useMemoFirebase(() => {
+    const locationsQuery = useMemoSupabase(() => {
         return { table: 'locations', __memo: true };
     }, []);
     const { data: locationsData, isLoading: isLoadingLocations, error, refetch } = useCollection<any>(locationsQuery);
@@ -47,6 +47,7 @@ export function LocationAdminPage() {
         description: item.description,
         panoramaUrl: item.panorama_url,
         thumbnailUrl: item.thumbnail_url,
+        placeId: item.place_id,
         coordinates: item.coordinates,
         connections: item.connections || [],
     })) : null;

@@ -2,19 +2,13 @@
 
 import * as React from 'react';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, MapPin, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Slider } from './ui/slider';
 import { type Location } from '@/lib/locations';
+import { type Map } from '@/lib/maps';
 import { getLocationPositionOnPage, getLocationsOnPage, getLocationMetadata, getMapOnlyLocationsOnPage, type LocationMapPosition } from '@/lib/map-positions';
-
-const MAP_IMAGES = [
-  '/maps/Page_1 copy.jpg',
-  '/maps/Page_2 copy.jpg',
-  '/maps/Page_3 copy.jpg',
-  '/maps/Page_4 copy.jpg',
-  '/maps/Page_5 copy.jpg',
-];
+import { useCollection, useMemoSupabase } from '@/supabase';
 
 type MapOnlyLocation = {
   id: string;
@@ -24,7 +18,8 @@ type MapOnlyLocation = {
 };
 
 type MapViewerProps = {
-  locations?: Location[];
+  locations?: Location[]; // Already filtered by place in CampusTour
+  placeId: string; // Required: maps are scoped to a place
   onLocationClick?: (locationId: string) => void;
   onMapOnlyLocationClick?: (location: MapOnlyLocation) => void;
   selectedMapOnlyLocation?: MapOnlyLocation | null;
@@ -32,6 +27,7 @@ type MapViewerProps = {
 
 export function MapViewer({ 
   locations = [], 
+  placeId,
   onLocationClick,
   onMapOnlyLocationClick,
   selectedMapOnlyLocation 
@@ -48,11 +44,51 @@ export function MapViewer({
   const [hoveredLocationId, setHoveredLocationId] = React.useState<string | null>(null);
   const [containerSize, setContainerSize] = React.useState({ width: 0, height: 0 });
 
-  const currentMap = MAP_IMAGES[currentMapIndex];
+  // Load maps dynamically from database based on placeId
+  // Always supply a query (avoid null) to keep hook order stable
+  const mapsQuery = useMemoSupabase(() => {
+    const safePlaceId = placeId || '__no_place__';
+    return {
+      table: 'maps',
+      filter: (query: any) => query.eq('place_id', safePlaceId).order('page_number', { ascending: true }),
+      __memo: true
+    };
+  }, [placeId]);
+
+  const { data: mapsData, isLoading: isLoadingMaps } = useCollection<any>(mapsQuery);
+  
+  // Map database fields to Map type
+  const maps: Map[] | null = mapsData
+    ? mapsData.map((item: any) => ({
+        id: item.id,
+        place_id: item.place_id,
+        name: item.name,
+        description: item.description,
+        image_url: item.image_url,
+        page_number: item.page_number,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+      }))
+    : null;
+
+  // Reset map index when maps change
+  React.useEffect(() => {
+    if (maps && maps.length > 0 && currentMapIndex >= maps.length) {
+      setCurrentMapIndex(0);
+    }
+  }, [maps, currentMapIndex]);
+
+  // Use dynamic maps if available, otherwise fall back to empty array
+  const mapImages = maps && maps.length > 0 
+    ? maps.map(map => map.image_url)
+    : [];
+
+  const currentMap = mapImages[currentMapIndex] || null;
   const canGoPrevious = currentMapIndex > 0;
-  const canGoNext = currentMapIndex < MAP_IMAGES.length - 1;
+  const canGoNext = currentMapIndex < mapImages.length - 1;
 
   // Get locations visible on the current map page based on name mapping
+  // Note: locations are already filtered by place_id in CampusTour component
   const visibleLocations = React.useMemo(() => {
     if (locations.length === 0) return [];
     
@@ -60,6 +96,7 @@ export function MapViewer({
     const locationNamesOnPage = getLocationsOnPage(currentMapIndex);
     
     // Filter locations that appear on this page (excluding map-only locations)
+    // All locations here already belong to the selected place (filtered upstream)
     return locations.filter((location) => {
       // Check if location name is mapped for this page
       const position = getLocationPositionOnPage(location.name, currentMapIndex);
@@ -75,7 +112,7 @@ export function MapViewer({
     console.log(`[MapViewer] Page ${currentMapIndex + 1} - Map-only locations:`, locations.length);
     return locations;
   }, [currentMapIndex]);
-  
+
   // Debug logging
   React.useEffect(() => {
     if (containerSize.width > 0 && containerSize.height > 0) {
@@ -258,7 +295,7 @@ export function MapViewer({
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft' && currentMapIndex > 0) {
         setCurrentMapIndex(prev => prev - 1);
-      } else if (e.key === 'ArrowRight' && currentMapIndex < MAP_IMAGES.length - 1) {
+      } else if (e.key === 'ArrowRight' && currentMapIndex < mapImages.length - 1) {
         setCurrentMapIndex(prev => prev + 1);
       } else if (e.key === '+' || e.key === '=') {
         setZoom(prev => Math.min(prev + 25, 300));
@@ -272,6 +309,36 @@ export function MapViewer({
       window.removeEventListener('keydown', handleKeyPress);
     };
   }, [currentMapIndex]);
+
+  // Show loading state if maps are being loaded
+  if (isLoadingMaps) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-gray-100 dark-bg-gray-900">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground">Loading maps...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if no maps are available
+  if (!maps || maps.length === 0) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <p className="text-muted-foreground">No maps available for this place.</p>
+      </div>
+    );
+  }
+
+  // Safety check: ensure currentMap exists
+  if (!currentMap) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-gray-100 dark:bg-gray-900">
+        <p className="text-muted-foreground">Map not found. Please select a valid map.</p>
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} className="relative h-full w-full bg-gray-900 overflow-hidden">
@@ -308,8 +375,8 @@ export function MapViewer({
           >
             <img
               ref={imageElementRef}
-              src={currentMap}
-              alt={`Campus Map Page ${currentMapIndex + 1}`}
+              src={currentMap || ''}
+              alt={maps && maps[currentMapIndex] ? maps[currentMapIndex].name : `Campus Map Page ${currentMapIndex + 1}`}
               className="select-none"
               style={{
                 display: 'block',
@@ -623,7 +690,7 @@ export function MapViewer({
         <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 flex items-center gap-4 shadow-lg">
           {/* Map Counter */}
           <span className="text-white text-sm font-medium">
-            Page {currentMapIndex + 1} of {MAP_IMAGES.length}
+            {maps && maps[currentMapIndex] ? maps[currentMapIndex].name : `Page ${currentMapIndex + 1}`} ({currentMapIndex + 1} of {mapImages.length})
           </span>
 
           {/* Zoom Controls */}
@@ -672,7 +739,7 @@ export function MapViewer({
 
         {/* Bottom Navigation Dots */}
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto flex gap-2">
-          {MAP_IMAGES.map((_, index) => (
+          {mapImages.map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrentMapIndex(index)}

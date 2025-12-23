@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useUser, useCollection, useMemoFirebase } from '@/supabase';
+import { useUser, useCollection, useMemoSupabase } from '@/supabase';
 import { deleteTourAction } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Trash2, Loader2 } from 'lucide-react';
@@ -32,7 +32,7 @@ export default function ToursPage() {
   const [tourToDelete, setTourToDelete] = React.useState<string | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
 
-  const savedToursQuery = useMemoFirebase(() => {
+  const savedToursQuery = useMemoSupabase(() => {
     if (!user) return null;
     return {
       table: 'saved_tours',
