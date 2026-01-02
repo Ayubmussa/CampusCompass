@@ -17,6 +17,7 @@ const TourRecommendationInputSchema = z.object({
       'The interests of the user, such as history, architecture, or student life.'
     ),
   availableLocations: z.array(z.string()).describe('A list of available campus locations.'),
+  availableMaps: z.array(z.string()).optional().describe('A list of available campus maps.'),
 });
 export type TourRecommendationInput = z.infer<typeof TourRecommendationInputSchema>;
 
@@ -32,6 +33,12 @@ const TourRecommendationOutputSchema = z.object({
     .describe(
       'A list of campus locations recommended for the user, based on their interests.'
     ),
+  recommendedMaps: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'A list of campus maps recommended for the user, based on their interests.'
+    ),
 });
 export type TourRecommendationOutput = z.infer<typeof TourRecommendationOutputSchema>;
 
@@ -45,15 +52,25 @@ const prompt = ai.definePrompt({
   name: 'tourRecommendationPrompt',
   input: {schema: TourRecommendationInputSchema},
   output: {schema: TourRecommendationOutputSchema},
-  prompt: `You are an expert tour guide for a university campus.
+  prompt: `You are an expert tour guide for a virtual tour platform.
 
-You will receive a list of available campus locations and the interests of the user.
-Based on the user's interests, you will generate a creative tour name, recommend a list of campus locations that they should visit, and provide a short, engaging description for the tour that explains why these locations are relevant.
+You will receive a list of available locations (with their categories and tags), maps, and the interests of the user.
+Based on the user's interests, you will generate a creative tour name, recommend a list of locations and/or maps that they should visit, and provide a short, engaging description for the tour that explains why these locations and maps are relevant.
+
+IMPORTANT: When matching user interests to locations, pay special attention to:
+- Categories (e.g., "Academic", "Dining", "Recreational", "Cultural")
+- Tags (e.g., "library", "café", "gym", "art")
+- Location descriptions
 
 User Interests: {{{interests}}}
-Available Locations: {{#each availableLocations}}{{{this}}}, {{/each}}
+Available Locations (format: Name [Category: X] [Tags: tag1, tag2] - Description): {{#each availableLocations}}{{{this}}}, {{/each}}
+{{#if availableMaps}}Available Maps: {{#each availableMaps}}{{{this}}}, {{/each}}{{/if}}
 
-Output the tour name, tour description, and recommended locations in a structured format.
+You can recommend both locations (360° panoramic views) and maps (2D floor plans) based on what best matches the user's interests. For example, if they're interested in navigation or layout, recommend maps. If they're interested in experiencing spaces, recommend locations.
+
+When returning recommended locations, return ONLY the location name (without the category, tags, or description).
+
+Output the tour name, tour description, recommended locations, and optionally recommended maps in a structured format.
 `,
 });
 

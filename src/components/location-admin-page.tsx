@@ -33,24 +33,51 @@ import { LocationForm } from './location-form';
 import { deleteLocationAction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { type Location } from '@/lib/locations';
+import { useUser } from '@/supabase';
+import { isSuperAdmin, canManagePlace } from '@/lib/admin-helpers';
 
 export function LocationAdminPage() {
+    const { user } = useUser();
     const locationsQuery = useMemoSupabase(() => {
         return { table: 'locations', __memo: true };
     }, []);
     const { data: locationsData, isLoading: isLoadingLocations, error, refetch } = useCollection<any>(locationsQuery);
     
     // Map database fields to Location type
-    const locations: Location[] | null = locationsData ? locationsData.map((item: any) => ({
+    const allLocations: Location[] | null = locationsData ? locationsData.map((item: any) => ({
         id: item.id,
         name: item.name,
         description: item.description,
+        richDescription: item.rich_description || undefined,
         panoramaUrl: item.panorama_url,
         thumbnailUrl: item.thumbnail_url,
         placeId: item.place_id,
+        tags: item.tags || [],
+        category: item.category || undefined,
+        openingHours: item.opening_hours || undefined,
+        contactInfo: item.contact_info || undefined,
+        pricingInfo: item.pricing_info || undefined,
+        capacity: item.capacity || undefined,
+        relatedLinks: item.related_links || [],
+        videoUrl: item.video_url || undefined,
+        audioUrl: item.audio_url || undefined,
         coordinates: item.coordinates,
         connections: item.connections || [],
     })) : null;
+
+    // Filter locations based on admin level and allocated places
+    const locations: Location[] | null = React.useMemo(() => {
+        if (!allLocations || !user?.profile) return null;
+        
+        if (isSuperAdmin(user.profile)) {
+            return allLocations; // Super admin sees all locations
+        }
+        
+        // Sub-admin only sees locations for their allocated places
+        return allLocations.filter(location => 
+            location.placeId && canManagePlace(user.profile, location.placeId)
+        );
+    }, [allLocations, user?.profile]);
 
     const [isFormOpen, setIsFormOpen] = React.useState(false);
     const [isAlertOpen, setIsAlertOpen] = React.useState(false);
@@ -120,7 +147,7 @@ export function LocationAdminPage() {
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Campus Locations</h2>
+                <h2 className="text-2xl font-bold">Locations</h2>
                 <Button onClick={handleAddNew}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Add New Location

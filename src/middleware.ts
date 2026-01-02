@@ -48,7 +48,8 @@ export async function middleware(request: NextRequest) {
   // Get the pathname
   const pathname = request.nextUrl.pathname;
 
-  // Allow access to login page and public assets
+  // Allow access to landing page, login page and public assets
+  const isLandingPage = pathname === '/landing';
   const isLoginPage = pathname === '/login';
   const isPublicAsset = pathname.startsWith('/_next') || 
                         pathname.match(/\.(ico|png|jpg|jpeg|svg|gif|webp)$/);
@@ -57,15 +58,13 @@ export async function middleware(request: NextRequest) {
   // Individual API routes should implement their own auth checks
   const isApiRoute = pathname.startsWith('/api');
 
-  // Redirect unauthenticated users to login (except for login page, API routes, and public assets)
-  if (!session && !isLoginPage && !isPublicAsset && !isApiRoute) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
+  // Redirect unauthenticated users to landing page (except for landing, login, API routes, and public assets)
+  if (!session && !isLandingPage && !isLoginPage && !isPublicAsset && !isApiRoute) {
+    return NextResponse.redirect(new URL('/landing', request.url));
   }
 
-  // Redirect authenticated users away from login page to home
-  if (session && isLoginPage) {
+  // Redirect authenticated users away from landing/login pages to home
+  if (session && (isLandingPage || isLoginPage)) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 

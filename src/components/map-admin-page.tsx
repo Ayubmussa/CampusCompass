@@ -33,9 +33,12 @@ import { MapForm } from './map-form';
 import { deleteMapAction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { type Map } from '@/lib/maps';
+import { useUser } from '@/supabase';
+import { isSuperAdmin, canManagePlace } from '@/lib/admin-helpers';
 import Image from 'next/image';
 
 export function MapAdminPage() {
+    const { user } = useUser();
     const mapsQuery = useMemoSupabase(() => {
         return { 
             table: 'maps',
@@ -46,7 +49,7 @@ export function MapAdminPage() {
     const { data: mapsData, isLoading: isLoadingMaps, error, refetch } = useCollection<any>(mapsQuery);
     
     // Map database fields to Map type
-    const maps: Map[] | null = mapsData ? mapsData.map((item: any) => ({
+    const allMaps: Map[] | null = mapsData ? mapsData.map((item: any) => ({
         id: item.id,
         place_id: item.place_id,
         name: item.name,
@@ -56,6 +59,18 @@ export function MapAdminPage() {
         created_at: item.created_at,
         updated_at: item.updated_at,
     })) : null;
+
+    // Filter maps based on admin level and allocated places
+    const maps: Map[] | null = React.useMemo(() => {
+        if (!allMaps || !user?.profile) return null;
+        
+        if (isSuperAdmin(user.profile)) {
+            return allMaps; // Super admin sees all maps
+        }
+        
+        // Sub-admin only sees maps for their allocated places
+        return allMaps.filter(map => canManagePlace(user.profile, map.place_id));
+    }, [allMaps, user?.profile]);
 
     const [isFormOpen, setIsFormOpen] = React.useState(false);
     const [isAlertOpen, setIsAlertOpen] = React.useState(false);

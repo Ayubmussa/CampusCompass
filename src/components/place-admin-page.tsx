@@ -33,9 +33,12 @@ import { PlaceForm } from './place-form';
 import { deletePlaceAction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { type Place } from '@/lib/places';
+import { useUser } from '@/supabase';
+import { isSuperAdmin, canManagePlace } from '@/lib/admin-helpers';
 import Image from 'next/image';
 
 export function PlaceAdminPage() {
+    const { user } = useUser();
     const placesQuery = useMemoSupabase(() => {
         return { 
             table: 'places',
@@ -45,8 +48,8 @@ export function PlaceAdminPage() {
     }, []);
     const { data: placesData, isLoading: isLoadingPlaces, error, refetch } = useCollection<any>(placesQuery);
     
-    // Map database fields to Place type
-    const places: Place[] | null = placesData ? placesData.map((item: any) => ({
+    // Map database fields to Place type and filter by admin permissions
+    const allPlaces: Place[] | null = placesData ? placesData.map((item: any) => ({
         id: item.id,
         name: item.name,
         description: item.description,
@@ -54,6 +57,18 @@ export function PlaceAdminPage() {
         created_at: item.created_at,
         updated_at: item.updated_at,
     })) : null;
+
+    // Filter places based on admin level
+    const places: Place[] | null = React.useMemo(() => {
+        if (!allPlaces || !user?.profile) return null;
+        
+        if (isSuperAdmin(user.profile)) {
+            return allPlaces; // Super admin sees all places
+        }
+        
+        // Sub-admin only sees their allocated places
+        return allPlaces.filter(place => canManagePlace(user.profile, place.id));
+    }, [allPlaces, user?.profile]);
 
     const [isFormOpen, setIsFormOpen] = React.useState(false);
     const [isAlertOpen, setIsAlertOpen] = React.useState(false);
@@ -114,14 +129,18 @@ export function PlaceAdminPage() {
         );
     }
 
+    const canManagePlaces = isSuperAdmin(user?.profile);
+
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <h2 className="font-headline text-2xl font-semibold">Places</h2>
-                <Button onClick={handleAddNew}>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add New Place
-                </Button>
+                {canManagePlaces && (
+                    <Button onClick={handleAddNew}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add New Place
+                    </Button>
+                )}
             </div>
 
             {places && places.length > 0 ? (
@@ -132,7 +151,7 @@ export function PlaceAdminPage() {
                                 <TableHead className="w-[100px]">Thumbnail</TableHead>
                                 <TableHead>Name</TableHead>
                                 <TableHead>Description</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
+                                {canManagePlaces && <TableHead className="text-right">Actions</TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -157,23 +176,25 @@ export function PlaceAdminPage() {
                                     <TableCell className="font-medium">{place.name}</TableCell>
                                     <TableCell className="max-w-md truncate">{place.description}</TableCell>
                                     <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleEdit(place)}
-                                            >
-                                                <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleDelete(place)}
-                                                className="text-destructive hover:text-destructive"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
+                                        {canManagePlaces && (
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleEdit(place)}
+                                                >
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleDelete(place)}
+                                                    className="text-destructive hover:text-destructive"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))}

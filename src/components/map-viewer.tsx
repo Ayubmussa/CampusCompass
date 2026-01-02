@@ -342,16 +342,24 @@ export function MapViewer({
 
   return (
     <div ref={containerRef} className="relative h-full w-full bg-gray-900 overflow-hidden">
-      {/* Map Image Container */}
+      {/* Map Image Container - Scrollable area */}
       <div 
         ref={scrollContainerRef}
-        className="relative h-full w-full overflow-auto"
-        style={{ cursor: zoom > 100 ? 'grab' : 'default' }}
+        className="relative h-full w-full overflow-auto overscroll-contain"
+        style={{ 
+          cursor: zoom > 100 ? 'grab' : 'default',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
+        }}
       >
         <div 
           ref={imageRef}
-          className="relative min-h-full min-w-full flex items-center justify-center"
-          style={{ padding: 0 }}
+          className="relative flex items-center justify-center"
+          style={{ 
+            padding: 0,
+            minHeight: '100%',
+            minWidth: '100%',
+          }}
         >
         <div
           ref={mapContainerRef}

@@ -3,16 +3,9 @@
 import { useState, useEffect } from 'react';
 import { User } from '@supabase/supabase-js';
 import { useSupabase } from '../provider';
+import type { AdminLevel, UserProfile as AdminUserProfile } from '@/lib/admin-types';
 
-export type UserProfile = {
-  uid: string;
-  email?: string | null;
-  displayName?: string | null;
-  photoURL?: string | null;
-  createdAt: string;
-  lastLogin: string;
-  isAdmin?: boolean;
-};
+export type UserProfile = AdminUserProfile;
 
 export interface UserHookResult {
   user: (User & { profile: UserProfile | null }) | null;
@@ -53,6 +46,9 @@ export const useUser = (): UserHookResult => {
         let userProfile: UserProfile | null = null;
 
         if (error && error.code === 'PGRST116') {
+          // Determine admin level for new users
+          const adminLevel: AdminLevel = authUser.email === 'admin@example.com' ? 'super_admin' : null;
+          
           const newProfile: UserProfile = {
             uid: authUser.id,
             email: authUser.email,
@@ -60,7 +56,8 @@ export const useUser = (): UserHookResult => {
             photoURL: authUser.user_metadata?.avatar_url || null,
             createdAt: new Date().toISOString(),
             lastLogin: new Date().toISOString(),
-            isAdmin: authUser.email === 'admin@example.com',
+            adminLevel,
+            allocatedPlaceIds: [],
           };
 
           const { data: createdProfile, error: createError } = await client
@@ -72,12 +69,23 @@ export const useUser = (): UserHookResult => {
               photo_url: newProfile.photoURL,
               created_at: newProfile.createdAt,
               last_login: newProfile.lastLogin,
-              is_admin: newProfile.isAdmin,
+              admin_level: newProfile.adminLevel,
             })
             .select()
             .single();
 
           if (createError) throw createError;
+          
+          // Load allocated places for sub-admins
+          let allocatedPlaceIds: string[] = [];
+          if (createdProfile.admin_level === 'sub_admin') {
+            const { data: allocations } = await client
+              .from('place_allocations')
+              .select('place_id')
+              .eq('user_id', createdProfile.uid);
+            allocatedPlaceIds = allocations?.map(a => a.place_id) || [];
+          }
+          
           userProfile = {
             uid: createdProfile.uid,
             email: createdProfile.email,
@@ -85,7 +93,8 @@ export const useUser = (): UserHookResult => {
             photoURL: createdProfile.photo_url,
             createdAt: createdProfile.created_at,
             lastLogin: createdProfile.last_login,
-            isAdmin: createdProfile.is_admin,
+            adminLevel: createdProfile.admin_level as AdminLevel,
+            allocatedPlaceIds,
           };
         } else if (error) {
           throw error;
@@ -95,6 +104,16 @@ export const useUser = (): UserHookResult => {
             .update({ last_login: new Date().toISOString() })
             .eq('uid', authUser.id);
           
+          // Load allocated places for sub-admins
+          let allocatedPlaceIds: string[] = [];
+          if (profile.admin_level === 'sub_admin') {
+            const { data: allocations } = await client
+              .from('place_allocations')
+              .select('place_id')
+              .eq('user_id', profile.uid);
+            allocatedPlaceIds = allocations?.map((a: any) => a.place_id) || [];
+          }
+          
           userProfile = {
             uid: profile.uid,
             email: profile.email,
@@ -102,7 +121,8 @@ export const useUser = (): UserHookResult => {
             photoURL: profile.photo_url,
             createdAt: profile.created_at,
             lastLogin: profile.last_login,
-            isAdmin: profile.is_admin,
+            adminLevel: profile.admin_level as AdminLevel,
+            allocatedPlaceIds,
           };
         }
 

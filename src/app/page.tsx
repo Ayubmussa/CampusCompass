@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { CampusTour } from '@/components/campus-tour';
 import { PlaceSelection } from '@/components/place-selection';
 import { LocationSelection } from '@/components/location-selection';
+import { motion } from 'motion/react';
 
 export default function Home() {
   const { user, isUserLoading, isProfileLoading } = useUser();
@@ -28,18 +29,85 @@ export default function Home() {
       return;
     }
 
-    // If user is not authenticated, redirect to login
+    // If user is not authenticated, redirect to landing page
     if (!user) {
-      router.replace('/login'); // prevent back to login after auth
+      router.replace('/landing'); // prevent back to landing after auth
       return;
     }
   }, [user, isLoading, router, mounted]);
 
-  // Show loading while checking authentication
-  if (!mounted || isLoading || !user) {
+  // Show loading while checking authentication or if user is not authenticated
+  // Don't render any content until we're sure the user is authenticated
+  if (!mounted || isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin" />
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-sky-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="absolute inset-0 overflow-hidden">
+          <motion.div
+            className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300 dark:bg-blue-900/30 rounded-full mix-blend-multiply dark:mix-blend-soft-light filter blur-xl opacity-70"
+            animate={{
+              scale: [1, 1.2, 1],
+              x: [0, 50, 0],
+              y: [0, 30, 0],
+            }}
+            transition={{
+              duration: 8,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+          <motion.div
+            className="absolute -bottom-40 -left-40 w-80 h-80 bg-sky-300 dark:bg-sky-900/30 rounded-full mix-blend-multiply dark:mix-blend-soft-light filter blur-xl opacity-70"
+            animate={{
+              scale: [1, 1.1, 1],
+              x: [0, -30, 0],
+              y: [0, -50, 0],
+            }}
+            transition={{
+              duration: 10,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+        </div>
+        <Loader2 className="h-12 w-12 animate-spin z-10" />
+      </div>
+    );
+  }
+
+  // After loading completes, if no user, show loading (redirect will happen)
+  // This prevents PlaceSelection from flashing
+  if (!user) {
+    return (
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-sky-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="absolute inset-0 overflow-hidden">
+          <motion.div
+            className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300 dark:bg-blue-900/30 rounded-full mix-blend-multiply dark:mix-blend-soft-light filter blur-xl opacity-70"
+            animate={{
+              scale: [1, 1.2, 1],
+              x: [0, 50, 0],
+              y: [0, 30, 0],
+            }}
+            transition={{
+              duration: 8,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+          <motion.div
+            className="absolute -bottom-40 -left-40 w-80 h-80 bg-sky-300 dark:bg-sky-900/30 rounded-full mix-blend-multiply dark:mix-blend-soft-light filter blur-xl opacity-70"
+            animate={{
+              scale: [1, 1.1, 1],
+              x: [0, -30, 0],
+              y: [0, -50, 0],
+            }}
+            transition={{
+              duration: 10,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+        </div>
+        <Loader2 className="h-12 w-12 animate-spin z-10" />
       </div>
     );
   }

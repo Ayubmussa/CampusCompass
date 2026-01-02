@@ -2,7 +2,6 @@
 'use client';
 
 import * as React from 'react';
-import { getTourRecommendationsAction, saveTourAction, type TourRecommendationState } from '@/app/actions';
 import {
   SidebarHeader,
   SidebarContent,
@@ -14,14 +13,7 @@ import {
   SidebarMenuButton,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
@@ -29,17 +21,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Loader2,
   LogOut,
-  Save,
   Shield,
-  Sparkles,
   User,
   Volume2,
-  Wand2,
   Info,
   MapPin,
   Map,
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 import { useSupabase, useCollection, useMemoSupabase, useUser } from '@/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -67,14 +55,6 @@ type TourSidebarProps = {
   onViewModeChange: (mode: ViewMode) => void;
 };
 
-function SubmitButton({ isPending }: { isPending: boolean }) {
-  return (
-    <Button type="submit" disabled={isPending} className="w-full">
-      {isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
-      Generate Tour
-    </Button>
-  );
-}
 
 function UserProfile() {
   const supabase = useSupabase();
@@ -115,7 +95,7 @@ function UserProfile() {
             </div>
           </div>
           <div className='flex items-center'>
-            {user.profile?.isAdmin && (
+            {(user.profile?.adminLevel === 'super_admin' || user.profile?.adminLevel === 'sub_admin') && (
                 <Button variant="ghost" size="icon" onClick={handleGoToAdmin} title="Go to Admin">
                     <Shield className="h-4 w-4" />
                 </Button>
@@ -224,60 +204,6 @@ export function TourSidebar({
   viewMode,
   onViewModeChange,
 }: TourSidebarProps) {
-  const { toast } = useToast();
-  const { user } = useUser();
-  
-  const [state, setState] = React.useState<TourRecommendationState>({ recommendations: null, error: null });
-  const [isPending, setIsPending] = React.useState(false);
-  const formRef = React.useRef<HTMLFormElement>(null);
-
-  const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setIsPending(true);
-
-    const formData = new FormData(event.currentTarget);
-    const result = await getTourRecommendationsAction(state, formData);
-    
-    setState(result);
-    setIsPending(false);
-  };
-  
-  const handleSaveTour = async () => {
-    if (!state.recommendations || !state.tourName || !state.tourDescription || !user) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Cannot save tour. Missing data.' });
-        return;
-    }
-
-    const result = await saveTourAction({
-        name: state.tourName,
-        description: state.tourDescription,
-        locationIds: state.recommendations.ids,
-        userId: user.id,
-    });
-
-    if (result.success) {
-        toast({ title: 'Tour Saved!', description: `"${state.tourName}" has been added to your tours.` });
-    } else {
-        toast({ variant: 'destructive', title: 'Save Failed', description: result.error });
-    }
-  };
-
-  React.useEffect(() => {
-    if (state.error) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: state.error,
-      });
-    }
-  }, [state.error, toast]);
-  
-  React.useEffect(() => {
-    if (state.recommendations) {
-        onStartTour(state.recommendations.ids);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.recommendations]);
 
 
   return (
@@ -290,7 +216,7 @@ export function TourSidebar({
                 <Map />
               </a>
             </Button>
-            <h1 className="font-headline text-xl font-semibold">UniSphere 360</h1>
+            <h1 className="font-headline text-xl font-semibold">Virtuality</h1>
           </div>
         </div>
       </SidebarHeader> */}
@@ -300,49 +226,6 @@ export function TourSidebar({
           {/* Location-specific content - only show in locations mode */}
           {viewMode === 'locations' && (
             <>
-          <SidebarGroup>
-            <Accordion type="single" collapsible defaultValue="item-1">
-              <AccordionItem value="item-1" className="border-none">
-                <AccordionTrigger className="font-headline text-base hover:no-underline">
-                  <div className="flex items-center gap-2">
-                    <Wand2 className="size-5 text-primary" />
-                    AI Guided Tour
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="space-y-4 pt-2">
-                  <p className="text-sm text-muted-foreground">
-                    Describe your interests and let our AI create a personalized tour for you.
-                  </p>
-                  <form ref={formRef} onSubmit={handleFormSubmit} className="space-y-4">
-                    <Textarea
-                      name="interests"
-                      placeholder="e.g., prospective computer science student"
-                      rows={3}
-                      disabled={isPending}
-                    />
-                    <SubmitButton isPending={isPending} />
-                  </form>
-                  {state.recommendations && state.tourName && (
-                    <div className="space-y-3 rounded-lg border bg-card p-3">
-                        <div className='flex items-start justify-between gap-2'>
-                          <div className='flex-grow'>
-                              <h4 className="font-headline font-semibold">{state.tourName}</h4>
-                              <p className="text-sm text-muted-foreground">{state.tourDescription}</p>
-                          </div>
-                          {user && (
-                            <Button size="icon" variant="ghost" onClick={handleSaveTour} title="Save Tour">
-                                <Save className="size-4" />
-                            </Button>
-                          )}
-                        </div>
-                    </div>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </SidebarGroup>
-
-          <SidebarSeparator />
           
           <SidebarGroup>
             <SidebarGroupLabel>
@@ -354,11 +237,11 @@ export function TourSidebar({
                 <div className='px-2'><Loader2 className="animate-spin" /></div>
              ) : (
                 <SidebarMenu>
-                {allLocations.map((location) => (
+                {allLocations.slice(0, 3).map((location) => (
                     <SidebarMenuItem key={location.id}>
                     <SidebarMenuButton 
                         onClick={() => onLocationSelect(location.id)}
-                        isActive={currentLocationId === location.id && (!state.recommendations || state.recommendations.ids.length === 0)}
+                        isActive={currentLocationId === location.id}
                     >
                         <span>{location.name}</span>
                     </SidebarMenuButton>
