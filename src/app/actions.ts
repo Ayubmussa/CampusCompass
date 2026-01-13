@@ -263,6 +263,27 @@ export async function addReviewAction(reviewData: {
             return { success: false, error: "User ID mismatch. Cannot add review." };
         }
 
+        // Validate rating
+        if (reviewData.rating < 1 || reviewData.rating > 5) {
+            return { success: false, error: "Rating must be between 1 and 5." };
+        }
+
+        // Check if user already has a review for this location
+        const { data: existingReview, error: checkError } = await supabase
+            .from('reviews')
+            .select('id')
+            .eq('location_id', reviewData.locationId)
+            .eq('user_id', user.id)
+            .single();
+
+        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
+            throw checkError;
+        }
+
+        if (existingReview) {
+            return { success: false, error: "You have already reviewed this location. You can edit your existing review instead." };
+        }
+
         const { error } = await supabase
             .from('reviews')
             .insert({
@@ -274,11 +295,123 @@ export async function addReviewAction(reviewData: {
             });
 
         if (error) throw error;
+
+        // Track activity
+        try {
+            await trackActivityAction({
+                activityType: 'review_submit',
+                locationId: reviewData.locationId,
+            });
+        } catch (activityError) {
+            // Don't fail review submission if activity tracking fails
+            console.error('Failed to track review activity:', activityError);
+        }
+
         return { success: true };
     } catch (error) {
         console.error("Error adding review: ", error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, error: `Failed to add review. ${errorMessage}` };
+    }
+}
+
+export async function updateReviewAction(reviewData: {
+    reviewId: string;
+    rating: number;
+    comment: string;
+    userId: string;
+}) {
+    const supabase = await createServerSupabaseClient();
+    try {
+        // Verify authentication
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
+            return { success: false, error: "You must be logged in to update reviews." };
+        }
+        
+        if (user.id !== reviewData.userId) {
+            return { success: false, error: "User ID mismatch. Cannot update review." };
+        }
+
+        // Validate rating
+        if (reviewData.rating < 1 || reviewData.rating > 5) {
+            return { success: false, error: "Rating must be between 1 and 5." };
+        }
+
+        // Verify the review belongs to the user
+        const { data: review, error: fetchError } = await supabase
+            .from('reviews')
+            .select('user_id')
+            .eq('id', reviewData.reviewId)
+            .single();
+
+        if (fetchError || !review) {
+            return { success: false, error: "Review not found." };
+        }
+
+        if (review.user_id !== user.id) {
+            return { success: false, error: "You can only update your own reviews." };
+        }
+
+        const { error } = await supabase
+            .from('reviews')
+            .update({
+                rating: reviewData.rating,
+                comment: reviewData.comment,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', reviewData.reviewId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error("Error updating review: ", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, error: `Failed to update review. ${errorMessage}` };
+    }
+}
+
+export async function deleteReviewAction(reviewId: string, userId: string) {
+    const supabase = await createServerSupabaseClient();
+    try {
+        // Verify authentication
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
+            return { success: false, error: "You must be logged in to delete reviews." };
+        }
+        
+        if (user.id !== userId) {
+            return { success: false, error: "User ID mismatch. Cannot delete review." };
+        }
+
+        // Verify the review belongs to the user
+        const { data: review, error: fetchError } = await supabase
+            .from('reviews')
+            .select('user_id')
+            .eq('id', reviewId)
+            .single();
+
+        if (fetchError || !review) {
+            return { success: false, error: "Review not found." };
+        }
+
+        if (review.user_id !== user.id) {
+            return { success: false, error: "You can only delete your own reviews." };
+        }
+
+        const { error } = await supabase
+            .from('reviews')
+            .delete()
+            .eq('id', reviewId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error("Error deleting review: ", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, error: `Failed to delete review. ${errorMessage}` };
     }
 }
 

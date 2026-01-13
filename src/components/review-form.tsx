@@ -8,6 +8,7 @@ import { addReviewAction } from '@/app/actions';
 import { StarRating } from './location-info-sheet';
 import { Loader2 } from 'lucide-react';
 import { useUser } from '@/supabase';
+import { useCollection, useMemoSupabase } from '@/supabase';
 
 type ReviewFormProps = {
   locationId: string;
@@ -20,6 +21,20 @@ export function ReviewForm({ locationId, user }: ReviewFormProps) {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const { toast } = useToast();
 
+  // Check if user already has a review for this location
+  const existingReviewQuery = useMemoSupabase(() => {
+    if (!locationId || !user) return null;
+    return {
+      table: 'reviews',
+      select: 'id',
+      filter: (query: any) => query.eq('location_id', locationId).eq('user_id', user.id).limit(1),
+      __memo: true,
+    };
+  }, [locationId, user?.id]);
+
+  const { data: existingReviews } = useCollection<{ id: string }>(existingReviewQuery);
+  const hasExistingReview = existingReviews && existingReviews.length > 0;
+
   if (!user) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -28,13 +43,30 @@ export function ReviewForm({ locationId, user }: ReviewFormProps) {
     );
   }
 
+  if (hasExistingReview) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        You have already reviewed this location. You can edit or delete your review below.
+      </p>
+    );
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (rating === 0 || comment.trim() === '') {
+    if (rating < 1 || rating > 5) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Rating',
+        description: 'Please select a rating between 1 and 5 stars.',
+      });
+      return;
+    }
+    
+    if (comment.trim() === '') {
       toast({
         variant: 'destructive',
         title: 'Incomplete Review',
-        description: 'Please provide a rating and a comment.',
+        description: 'Please provide a comment.',
       });
       return;
     }
@@ -43,7 +75,7 @@ export function ReviewForm({ locationId, user }: ReviewFormProps) {
     const result = await addReviewAction({
       locationId,
       rating,
-      comment,
+      comment: comment.trim(),
       userId: user.id,
       displayName: user.profile?.displayName || user.email?.split('@')[0] || 'User',
     });
@@ -56,6 +88,8 @@ export function ReviewForm({ locationId, user }: ReviewFormProps) {
       });
       setRating(0);
       setComment('');
+      // Trigger a refresh by dispatching a custom event
+      window.dispatchEvent(new CustomEvent('reviewAdded'));
     } else {
       toast({
         variant: 'destructive',

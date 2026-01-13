@@ -134,7 +134,7 @@ export function CollectionAdminPage() {
         );
     }
 
-    const canManageCollections = isSuperAdmin(user?.profile) || (user?.profile?.adminLevel === 'sub_admin' && user.profile.allocatedPlaces && user.profile.allocatedPlaces.length > 0);
+    const canManageCollections = isSuperAdmin(user?.profile) || (user?.profile?.adminLevel === 'sub_admin' && user.profile.allocatedPlaceIds && user.profile.allocatedPlaceIds.length > 0);
 
     return (
         <div className="space-y-4">

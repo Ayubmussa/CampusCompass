@@ -47,7 +47,15 @@ export const useUser = (): UserHookResult => {
 
         if (error && error.code === 'PGRST116') {
           // Determine admin level for new users
+          // Database schema requires 'user', 'sub_admin', or 'super_admin' (not null)
           const adminLevel: AdminLevel = authUser.email === 'admin@example.com' ? 'super_admin' : null;
+          // Convert null to 'user' for database insertion (schema doesn't allow null)
+          const dbAdminLevel = adminLevel || 'user';
+          
+          // Ensure email exists
+          if (!authUser.email) {
+            throw new Error('User email is required to create profile');
+          }
           
           const newProfile: UserProfile = {
             uid: authUser.id,
@@ -69,12 +77,26 @@ export const useUser = (): UserHookResult => {
               photo_url: newProfile.photoURL,
               created_at: newProfile.createdAt,
               last_login: newProfile.lastLogin,
-              admin_level: newProfile.adminLevel,
+              admin_level: dbAdminLevel, // Use 'user' instead of null for database
             })
             .select()
             .single();
 
-          if (createError) throw createError;
+          if (createError) {
+            // Log detailed error information
+            console.error('Error creating user profile:', {
+              message: createError.message,
+              code: createError.code,
+              details: createError.details,
+              hint: createError.hint,
+              error: createError,
+            });
+            throw createError;
+          }
+
+          if (!createdProfile) {
+            throw new Error('Profile creation succeeded but no data returned');
+          }
           
           // Load allocated places for sub-admins
           let allocatedPlaceIds: string[] = [];
@@ -86,6 +108,9 @@ export const useUser = (): UserHookResult => {
             allocatedPlaceIds = allocations?.map(a => a.place_id) || [];
           }
           
+          // Convert 'user' back to null for TypeScript type consistency
+          const profileAdminLevel: AdminLevel = createdProfile.admin_level === 'user' ? null : (createdProfile.admin_level as AdminLevel);
+          
           userProfile = {
             uid: createdProfile.uid,
             email: createdProfile.email,
@@ -93,7 +118,7 @@ export const useUser = (): UserHookResult => {
             photoURL: createdProfile.photo_url,
             createdAt: createdProfile.created_at,
             lastLogin: createdProfile.last_login,
-            adminLevel: createdProfile.admin_level as AdminLevel,
+            adminLevel: profileAdminLevel,
             allocatedPlaceIds,
           };
         } else if (error) {
@@ -114,6 +139,9 @@ export const useUser = (): UserHookResult => {
             allocatedPlaceIds = allocations?.map((a: any) => a.place_id) || [];
           }
           
+          // Convert 'user' back to null for TypeScript type consistency
+          const existingAdminLevel: AdminLevel = profile.admin_level === 'user' ? null : (profile.admin_level as AdminLevel);
+          
           userProfile = {
             uid: profile.uid,
             email: profile.email,
@@ -121,7 +149,7 @@ export const useUser = (): UserHookResult => {
             photoURL: profile.photo_url,
             createdAt: profile.created_at,
             lastLogin: profile.last_login,
-            adminLevel: profile.admin_level as AdminLevel,
+            adminLevel: existingAdminLevel,
             allocatedPlaceIds,
           };
         }
@@ -140,10 +168,32 @@ export const useUser = (): UserHookResult => {
       } catch (error: any) {
         if (!mounted) return;
         
-        console.error('Error fetching or creating user profile:', error);
+        // Extract error details for better logging
+        const errorDetails = {
+          message: error?.message || 'Unknown error',
+          code: error?.code || 'UNKNOWN',
+          details: error?.details || null,
+          hint: error?.hint || null,
+          status: error?.status || null,
+          statusText: error?.statusText || null,
+          originalError: error,
+        };
+        
+        console.error('Error fetching or creating user profile:', errorDetails);
+        
+        // Create a more informative error object
+        const userError = new Error(
+          errorDetails.message || 
+          errorDetails.details || 
+          'Failed to fetch or create user profile'
+        );
+        (userError as any).code = errorDetails.code;
+        (userError as any).details = errorDetails.details;
+        (userError as any).hint = errorDetails.hint;
+        
         setUserState(prev => ({
           ...prev,
-          userError: error,
+          userError,
           isProfileLoading: false,
         }));
       }

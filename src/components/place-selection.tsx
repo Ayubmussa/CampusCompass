@@ -29,6 +29,14 @@ export function PlaceSelection() {
   const { user, isUserLoading } = useUser();
   const supabase = useSupabase();
 
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
+  // Redirect to landing if not authenticated
+  React.useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.replace('/landing');
+    }
+  }, [user, isUserLoading, router]);
+
   const placesQuery = useMemoSupabase(() => {
     return {
       table: 'places',
@@ -39,6 +47,24 @@ export function PlaceSelection() {
   }, []);
 
   const { data: placesData, isLoading, error } = useCollection<any>(placesQuery);
+
+  // Log error for debugging
+  React.useEffect(() => {
+    if (error) {
+      console.error('Error loading places:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        code: (error as any)?.code,
+        details: (error as any)?.details,
+        hint: (error as any)?.hint,
+      });
+    }
+    if (placesData) {
+      console.log('Places data loaded:', placesData.length, 'places');
+    } else if (!isLoading && !error) {
+      console.warn('No places data returned, but no error. This might be an RLS policy issue.');
+    }
+  }, [error, placesData, isLoading]);
 
   // Fetch all locations for AI context
   const allLocationsQuery = useMemoSupabase(() => {
@@ -63,19 +89,6 @@ export function PlaceSelection() {
   }, []);
 
   const { data: collectionsData } = useCollection<any>(collectionsQuery);
-  const collections: Collection[] | null = collectionsData
-    ? collectionsData.map((item: any) => ({
-        id: item.id,
-        place_id: item.place_id,
-        name: item.name,
-        description: item.description,
-        thumbnail_url: item.thumbnail_url,
-        is_featured: item.is_featured || false,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        created_by: item.created_by,
-      }))
-    : null;
 
   // Map database fields to Place type
   const places: Place[] | null = placesData
@@ -89,16 +102,42 @@ export function PlaceSelection() {
       }))
     : null;
 
-  // Group collections by place
+  // Group collections by place - use useMemo to transform collectionsData
   const collectionsByPlace = React.useMemo(() => {
-    if (!collections) return new Map<string, Collection[]>();
+    if (!collectionsData) return new Map<string, Collection[]>();
+    const collections: Collection[] = collectionsData.map((item: any) => ({
+      id: item.id,
+      place_id: item.place_id,
+      name: item.name,
+      description: item.description,
+      thumbnail_url: item.thumbnail_url,
+      is_featured: item.is_featured || false,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+      created_by: item.created_by,
+    }));
     const map = new Map<string, Collection[]>();
     collections.forEach(collection => {
       const existing = map.get(collection.place_id) || [];
       map.set(collection.place_id, [...existing, collection]);
     });
     return map;
-  }, [collections]);
+  }, [collectionsData]);
+
+  // Transform collectionsData to collections array
+  const collections: Collection[] | null = collectionsData
+    ? collectionsData.map((item: any) => ({
+        id: item.id,
+        place_id: item.place_id,
+        name: item.name,
+        description: item.description,
+        thumbnail_url: item.thumbnail_url,
+        is_featured: item.is_featured || false,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        created_by: item.created_by,
+      }))
+    : null;
 
   const handleCollectionClick = (collectionId: string, placeId: string) => {
     // Navigate to location selection with collection filter
@@ -132,7 +171,46 @@ export function PlaceSelection() {
     }
   };
 
-  if (isUserLoading || isLoading) {
+  // Don't render anything if user is not authenticated (after all hooks are called)
+  // This check must come after all hooks to follow Rules of Hooks
+  if (isUserLoading || !user) {
+    return (
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-sky-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="absolute inset-0 overflow-hidden">
+          <motion.div
+            className="absolute -top-40 -right-40 w-80 h-80 bg-blue-300 dark:bg-blue-900/30 rounded-full mix-blend-multiply dark:mix-blend-soft-light filter blur-xl opacity-70"
+            animate={{
+              scale: [1, 1.2, 1],
+              x: [0, 50, 0],
+              y: [0, 30, 0],
+            }}
+            transition={{
+              duration: 8,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+          <motion.div
+            className="absolute -bottom-40 -left-40 w-80 h-80 bg-sky-300 dark:bg-sky-900/30 rounded-full mix-blend-multiply dark:mix-blend-soft-light filter blur-xl opacity-70"
+            animate={{
+              scale: [1, 1.1, 1],
+              x: [0, -30, 0],
+              y: [0, -50, 0],
+            }}
+            transition={{
+              duration: 10,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+        </div>
+        <Loader2 className="h-12 w-12 animate-spin z-10" />
+      </div>
+    );
+  }
+
+  // Show loading while data is being fetched
+  if (isLoading) {
     return (
       <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-sky-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="absolute inset-0 overflow-hidden">

@@ -60,11 +60,21 @@ export async function middleware(request: NextRequest) {
 
   // Redirect unauthenticated users to landing page (except for landing, login, API routes, and public assets)
   if (!session && !isLandingPage && !isLoginPage && !isPublicAsset && !isApiRoute) {
-    return NextResponse.redirect(new URL('/landing', request.url));
+    const landingUrl = new URL('/landing', request.url);
+    // Use 307 (Temporary Redirect) to ensure the redirect is followed immediately
+    return NextResponse.redirect(landingUrl, 307);
   }
 
-  // Redirect authenticated users away from landing/login pages to home
-  if (session && (isLandingPage || isLoginPage)) {
+  // Redirect authenticated users away from landing/login pages
+  // Landing page is only for unauthenticated users
+  if (session && isLandingPage) {
+    // For authenticated users, redirect to home (role-based redirect will happen in the page component)
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+  
+  // Redirect authenticated users away from login page
+  if (session && isLoginPage) {
+    // Redirect to home (role-based redirect will happen in the page component)
     return NextResponse.redirect(new URL('/', request.url));
   }
 
@@ -81,6 +91,7 @@ export const config = {
      * Feel free to modify this pattern to include more paths.
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/', // Explicitly match root path
   ],
 };
 

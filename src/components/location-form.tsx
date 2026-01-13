@@ -27,6 +27,7 @@ import { addLocationAction, updateLocationAction, generateLocationDescriptionAct
 import { Loader2, X, Plus, Sparkles } from 'lucide-react';
 import { type Location } from '@/lib/locations';
 import { useSupabase, useUser, useCollection, useMemoSupabase } from '@/supabase';
+import { isAdmin } from '@/lib/admin-helpers';
 import { Progress } from '@/components/ui/progress';
 import { type Place } from '@/lib/places';
 import { Badge } from '@/components/ui/badge';
@@ -265,7 +266,7 @@ export function LocationForm({ location, onFormSubmit }: LocationFormProps) {
     };
     
     console.log('Submitting location data:', locationData);
-    console.log('User info:', { id: user.id, isAdmin: user.profile?.isAdmin, email: user.email });
+    console.log('User info:', { id: user.id, isAdmin: isAdmin(user.profile), email: user.email });
     
     if (location) {
         result = await updateLocationAction({ id: location.id, ...locationData });

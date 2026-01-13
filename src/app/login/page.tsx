@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSupabase, useUser } from '@/supabase';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ import { motion } from 'motion/react';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/theme-toggle';
 
-export default function LoginPage() {
+function LoginForm() {
   const supabase = useSupabase();
   const { user, isUserLoading, isProfileLoading } = useUser();
   const router = useRouter();
@@ -358,5 +358,17 @@ export default function LoginPage() {
         </Card>
       </motion.div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

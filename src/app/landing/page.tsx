@@ -44,11 +44,12 @@ export default function LandingPage() {
   }, []);
 
   // Redirect authenticated users away from landing page
+  // Landing page is only for unauthenticated users
   useEffect(() => {
     if (isLoading) return;
     
     if (user) {
-      // If user is authenticated, redirect to home (place selection)
+      // If user is authenticated (any role), redirect based on their role
       if (user.profile?.adminLevel === 'super_admin' || user.profile?.adminLevel === 'sub_admin') {
         router.replace('/admin');
       } else {

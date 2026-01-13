@@ -21,9 +21,22 @@ export default function AdminPage() {
   const { user, isUserLoading, isProfileLoading } = useUser();
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState('places');
+  const [particles, setParticles] = React.useState<Array<{ left: number; top: number; duration: number; delay: number }>>([]);
 
   // We are only "done" loading when both are false.
   const isLoading = isUserLoading || isProfileLoading;
+
+  React.useEffect(() => {
+    // Generate particles only on client side to avoid hydration mismatch
+    setParticles(
+      [...Array(20)].map(() => ({
+        left: Math.random() * 100,
+        top: Math.random() * 100,
+        duration: 3 + Math.random() * 4,
+        delay: Math.random() * 2,
+      }))
+    );
+  }, []);
 
   React.useEffect(() => {
     // This effect should ONLY run when loading is fully complete.
@@ -132,22 +145,22 @@ export default function AdminPage() {
       </div>
 
       {/* Floating particles */}
-      {[...Array(20)].map((_, i) => (
+      {particles.map((particle, i) => (
         <motion.div
           key={i}
           className="absolute w-2 h-2 bg-sky-400/20 dark:bg-sky-400/10 rounded-full"
           style={{
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
+            left: `${particle.left}%`,
+            top: `${particle.top}%`,
           }}
           animate={{
             y: [0, -30, 0],
             opacity: [0.2, 0.5, 0.2],
           }}
           transition={{
-            duration: 3 + Math.random() * 4,
+            duration: particle.duration,
             repeat: Infinity,
-            delay: Math.random() * 2,
+            delay: particle.delay,
             ease: "easeInOut",
           }}
         />
@@ -183,7 +196,7 @@ export default function AdminPage() {
               className="flex items-center gap-2"
             >
               <ThemeToggle />
-              <BackButton />
+              <BackButton fallbackRoute="/admin" label="Back" />
             </motion.div>
           </div>
         </header>
